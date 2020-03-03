@@ -1,0 +1,380 @@
+---
+title: "Simulación - Difusión límite del modelo de Wright-Fisher con selección y mutación"
+author: "Gerardo Martínez"
+date: "15 de noviembre de 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+El siguiente código mostrará cómo obtener gráficos de las trayectorias del proceso de difusión límite de un modelo de Wright-Fisher con selección y mutación.
+
+Recordemos que el proceso de difusión límite es solución de la ecuación diferencial estocástica
+
+\begin{equation*}
+\left\{
+\begin{array}{rcl}
+dX_t & = &  (-u_1X_t + u_2 (1-X_t) + \\ 
+& & X_t^2 (1-X_t) \sigma_{11} + X_t (1-X_t)(1-2X_t) \sigma_{12} - X_t(1-X_t)^2 \sigma_{22}) dt \\
+& & + \sqrt{X_t(1-X_t)} \, dW_t \\
+X_0  & =  & p_0 \in (0,1)
+\end{array}
+\right.
+\end{equation*}
+donde
+\begin{equation}
+\omega_{ij} = 1 + \frac{\sigma_{ij}}{2N}, \qquad \mu_i = \frac{u_i}{2N}
+\end{equation}
+
+Para simular trayectorias en el intervalo $[0,T]$ se utilizará el esquema de Milstein. Fijaremos, en primer lugar, el tiempo $T$ y una precisión $n$.
+```{r}
+T <- 10
+n <- 1e5
+```
+Será necesario, asimismo, indicar una cantidad $k$ de trayectorias a graficar.
+
+```{r}
+k <- 10
+```
+Indicaremos cuáles son los parámetros de la difusión; a saber: $p_0$, $u_1$, $u_2$, $\sigma_{11}$, $\sigma_{12}$ y $\sigma_{22}$.
+
+```{r}
+p0 <- 0.5
+N <- 100
+s11 <- 0
+s12 <- 0
+s22 <- 0
+mu1 <- 0.1*2*N
+mu2 <- 0.1*2*N
+```
+Se construirá una matriz, *replicas*, de tamaño $k \times (n+1)$ que tendrá, luego de la implementación del esquema de Milstein, los valores de las trayectorias para cada punto $i/n$ con $i \in \{0, 1, \dots, n\}$.
+
+```{r}
+replicas <- matrix(rep(0,k*(n+1)), ncol=k)
+```
+
+El código para completar la matriz *replicas* con las trayectorias dependerá de si las tasas de mutación $\mu_1$ y $\mu_2$ son iguales a 0 o no.
+
+Si las tasas de mutación cumplen que $\mu_1, \mu_2 > 0$ entonces el código para completar la matriz es:
+
+```{r eval=FALSE}
+for (j in 1:k){
+  # Inicialización
+  tr <- rep(0, times = n+1)
+  tr[1] <- p0
+  
+  # Bucle
+  for (i in 1:n){
+    W <- sqrt(T/n)*rnorm(1)
+    
+    tr[i+1] <- tr[i] + 
+          -mu1*tr[i]*2*N*T/n +
+          mu2*(1 - tr[i])*2*N*T/n +
+          (tr[i])*(1-tr[i])*s11*2*N*T/n + 
+          (tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+          (tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+          sqrt(tr[i]*(1-tr[i]))*W +
+          (((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+      
+    # en caso de que por error de simulación
+    # se obtenga un valor menor que 0
+    if (tr[i+1]<=0){
+      tr[i+1] <- 0
+    }
+    
+    # en caso de que por error de simulación
+    # se obtenga un valor mayor que 1
+    if (tr[i+1]>=1){
+      tr[i+1] <- 1
+    }
+  }
+  replicas[,j] <- tr
+}
+```
+Si $\mu_1 = 0$ entonces la difusión presenta un estado absorbente en $x = 1$. Tendremos que controlar entonces que, si una trayectoria alcanza el estado $x = 1$ en un tiempo $t_{i}$ permanecerá en este estado para todo $t  \ge q t_i$. El código será modificado consecuentemente de la siguiente forma:
+
+```{r eval=FALSE}
+for (j in 1:k){
+  # Inicialización
+  tr <- rep(0, times = n+1)
+  tr[1] <- p0
+  
+  # Bucle
+  for (i in 1:n){
+    if (tr[i] != 1){
+    W <- sqrt(T/n)*rnorm(1)
+    
+    tr[i+1] <- tr[i] + 
+          mu2*(1 - tr[i])*2*N*T/n +
+          (tr[i])*(1-tr[i])*s11*2*N*T/n + 
+          (tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+          (tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+          sqrt(tr[i]*(1-tr[i]))*W +
+          (((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+    } else {
+      tr[i+1] <- 1
+    }
+      
+    # en caso de que por error de simulación
+    # se obtenga un valor menor que 0
+    if (tr[i+1]<=0){
+      tr[i+1] <- 0
+    }
+    
+    # en caso de que por error de simulación
+    # se obtenga un valor mayor que 1
+    if (tr[i+1]>=1){
+      tr[i+1] <- 1
+    }
+  }
+  replicas[,j] <- tr
+}
+```
+Del mismo modo, si $\mu_2 = 0$, la difusión presenta un estado absorbente en $x = 0$. El código en este caso será
+
+```{r eval=FALSE}
+for (j in 1:k){
+  # Inicialización
+  tr <- rep(0, times = n+1)
+  tr[1] <- p0
+  
+  # Bucle
+  for (i in 1:n){
+    if (tr[i] != 0){
+      W <- sqrt(T/n)*rnorm(1)
+      
+      tr[i+1] <- tr[i] + 
+            -mu1*tr[i]*2*N*T/n +
+            (tr[i])*(1-tr[i])*s11*2*N*T/n + 
+            (tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+            (tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+            sqrt(tr[i]*(1-tr[i]))*W +
+            (((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+        
+      # en caso de que por error de simulación
+      # se obtenga un valor menor que 0
+      if (tr[i+1]<=0){
+        tr[i+1] <- 0
+      }
+      
+      # en caso de que por error de simulación
+      # se obtenga un valor mayor que 1
+      if (tr[i+1]>=1){
+        tr[i+1] <- 1
+      }
+    } else {
+      tr[i+1] <- 0
+    }
+  }
+  replicas[,j] <- tr
+}
+```
+Por último, si $\mu_1 = \mu_2 = 0$, entonces la difusión tendrá los estados absorbentes $x = 1$ y $x = 0$. El código en este caso es
+
+```{r eval=FALSE}
+for (j in 1:k){
+  # Inicialización
+  tr <- rep(0, times = n+1)
+  tr[1] <- .5
+  
+  # Bucle
+  for (i in 1:n){
+    if (tr[i]!=0){
+      if(tr[i]!=1){
+        # si la frecuencia del alelo
+        # es distinta de 0 o 1, utilizo el proceso de difusión
+        
+        W <- sqrt(T/n)*rnorm(1)
+        tr[i+1] <- tr[i] + 
+          (tr[i])*(1-tr[i])*s11*2*N*T/n + 
+          (tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+          (tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+          sqrt(tr[i]*(1-tr[i]))*W +
+          (((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+    
+        # en caso de que por error de simulación
+        # se obtenga un valor menor que 0
+        if (tr[i+1]<=0){
+          tr[i+1] <- 0
+        }
+    
+        # en caso de que por error de simulación
+        # se obtenga un valor mayor que 1
+        if (tr[i+1]>=1){
+          tr[i+1] <- 1
+        }
+        
+      } else {
+        tr[i+1] <- 1
+      }
+    } else {
+      tr[i+1] <- 0
+    }
+  }
+  replicas[,j] <- tr
+}
+```
+
+La construcción de las trayectorias está resumida en la función $\texttt{trayectoriasWFMS()}$. Esta función va a tomar como parámetros el número de trayectorias $k$, la precisión del esquema de Milstein $n$ y los parámetros del modelo $p_0$, $N$, $u_1$, $u_2$, $\sigma_{11}$, $\sigma_{12}$ y $\sigma_{22}$ y dará como resultado una matriz con las trayectorias simuladas.
+
+```{r}
+trayectoriasWFMS <- function(k, n, T, p0, N, u1, u2, s11, s12, s22) {
+	replicas <- matrix(rep(0, k * (n + 1)), ncol = k)
+  
+	if (u1 == 0) {
+		if (u2 == 0) {
+			for (j in 1:k) {
+				# Inicialización
+				tr <- rep(0, times = n + 1)
+				tr[1] <- p0
+		  
+				# Bucle
+				for (i in 1:n) {
+					if (tr[i] != 0) {
+						if (tr[i] != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+		  
+							W <- sqrt(T / n) * rnorm(1)
+							tr[i + 1] <- tr[i] +
+							(tr[i]) ^ 2 * (1 - tr[i]) * 2* N * s11 * T / n +
+							(tr[i]) * (1 - tr[i]) * (1 - 2 * tr[i]) * 2 * N * s12 * T / n -
+							(tr[i]) * (1 - tr[i]) ^ 2 * 2 * N * s22 * T / n +
+							sqrt(tr[i] * (1 - tr[i])) * W +
+							(((-2 * tr[i] + 1) / (4)) * (W ^ 2 - T / n))
+		  
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i + 1] <= 0) {
+							tr[i + 1] <- 0
+							}
+		  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i + 1] >= 1) {
+							tr[i + 1] <- 1
+							}
+		  
+						} else {
+							tr[i + 1] <- 1
+						}
+					} else {
+						tr[i + 1] <- 0
+					}
+				}
+				
+				replicas[, j] <- tr
+			}
+		}	else{
+			for (j in 1:k){
+				# Inicialización
+				tr <- rep(0, times = n+1)
+				tr[1] <- p0
+		  
+				# Bucle
+				for (i in 1:n){
+					if (tr[i] != 1){
+						W <- sqrt(T/n)*rnorm(1)
+			  
+						tr[i+1] <- tr[i] + 
+							u2*(1 - tr[i])*2*N*T/n +
+							(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+							(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+							(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+							sqrt(tr[i]*(1-tr[i]))*W +
+							(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+				
+						# en caso de que por error de siulación
+						# se obtenga un valor menor que 0
+						if (tr[i+1]<=0){
+							tr[i+1] <- 0
+						}
+			  
+						# en caso de que por error de siulación
+						# se obtenga un valor mayor que 1
+						if (tr[i+1]>=1){
+							tr[i+1] <- 1
+						}
+					} else {
+						tr[i+1] <- 1
+					}
+				}
+			replicas[,j] <- tr
+			}
+		}
+	}	else{
+			if(u2 == 0){
+				for (j in 1:k){
+					# Inicialización
+					tr <- rep(0, times = n+1)
+					tr[1] <- p0
+			  
+					# Bucle
+					for (i in 1:n){
+						if (tr[i] != 0){
+							W <- sqrt(T/n)*rnorm(1)
+				  
+							tr[i+1] <- tr[i] + 
+								-u1*tr[i]*2*N*T/n +
+								(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+								(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+								(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+								sqrt(tr[i]*(1-tr[i]))*W +
+								(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+					
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i+1]<=0){
+								tr[i+1] <- 0
+							}
+				  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i+1]>=1){
+								tr[i+1] <- 1
+							}
+						} else {
+							tr[i+1] <- 0
+						}
+					}
+					replicas[,j] <- tr
+				}
+			}	else{
+					for (j in 1:k){
+						# Inicialización
+						tr <- rep(0, times = n+1)
+						tr[1] <- p0
+		  
+						# Bucle
+						for (i in 1:n){
+							W <- sqrt(T/n)*rnorm(1)
+				  
+							tr[i+1] <- tr[i] +
+								-u1*tr[i]*2*N*T/n +
+								u2*(1 - tr[i])*2*N*T/n +
+								(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+								(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+								(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+								sqrt(tr[i]*(1-tr[i]))*W +
+								(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+					
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i+1]<=0){
+								tr[i+1] <- 0
+							}
+				  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i+1]>=1){
+								tr[i+1] <- 1
+							}
+						}
+					replicas[,j] <- tr
+					}
+				}
+	}
+	return(replicas)
+}
+```

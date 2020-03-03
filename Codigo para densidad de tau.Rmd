@@ -1,0 +1,334 @@
+---
+title: "Código para hallar la densidad de tau"
+author: "Gerardo Martínez"
+date: "15 de noviembre de 2018"
+output: html_document
+---
+
+El siguiente código mostrará cómo hallar la densidad de $\tau$ con
+
+\begin{equation}
+  \tau = \inf_{t \geq 0} \{X_t \in \{0,1\}\}
+\end{equation}
+y $X = \{X_t\}_{t \geq 0}$ la solución de la ecuación diferencial estocástica
+
+\begin{equation*}
+\left\{
+\begin{array}{rcl}
+dX_t & = &  (-u_1X_t + u_2 (1-X_t) + \\ 
+& & X_t^2 (1-X_t) \sigma_{11} + X_t (1-X_t)(1-2X_t) \sigma_{12} - X_t(1-X_t)^2 \sigma_{22}) dt \\
+& & + \sqrt{X_t(1-X_t)} \, dW_t \\
+X_0  & =  & p_0 \in (0,1)
+\end{array}
+\right.
+\end{equation*}
+donde
+\begin{equation}
+\omega_{ij} = 1 + \frac{\sigma_{ij}}{2N}, \qquad \mu_i = \frac{u_i}{2N}
+\end{equation}
+Para obtener simulaciones de $\tau$ simularemos trayectorias de $X$ con el esquema de Milstein hasta que alcance uno de los estados $0$ o $1$.
+
+Para esto consideraremos la función $\texttt{densidadTau()}$ que es una modificación de la función $\texttt{trayectoriasWFMS()}$. En este caso, simularemos trayectorias hasta un tiempo $T$ muy grande y detendremos la simulación si $X_t \in \{0,1\}$ con $t \leq T$: el algoritmo devolverá los tiempos $t$ en donde la trayectoria simulada alcanza los estados $0$ o $1$. En caso de que $X_t \notin \{0,1\}$ para ningún $t \leq T$, entonces el algoritmo devolverá el valor $T$. Se recomienda utilizar un tiempo $T$ suficientemente grande para evitar la menor cantidad posible de valores truncados.
+
+$\texttt{densidadTau()}$ tendrá los siguientes parámetros:
+
+* $k$: Cantidad de observaciones de $\tau$.
+* $n$: Precisión de la solución de la ecuación diferencial estocástica según el esquema de Milstein.
+* $T$: Tiempo $T$ hasta donde se realiza la simulación.
+* $N$: Tamaño poblacional.
+* $p_0$: Valor inicial de $X$.
+* $u_1$: Probabilidad reescalada según $N$ de mutar del alelo $A$ al $a$.
+* $u_2$: Probabilidad reescalada según $N$ de mutar del alelo $a$ al $A$.
+* $s_{11}$: Viabilidad reescalada según $N$ del genotipo $AA$.
+* $s_{12}$: Viabilidad reescalada según $N$ del genotipo $Aa$.
+* $s_{22}$: Viabilidad reescalada según $N$ del genotipo $aa$.
+
+```{r}
+densidadTau <- function(k, n, T, p0, N, u1, u2, s11, s12, s22){
+	# se construye un vector tau
+	# que será completado con los valores simulados de tau
+	tau <- rep(0, k)
+	
+	if (u1 == 0) {
+		if (u2 == 0) {
+			for (j in 1:k) {
+				# inicializamos la tr en p0
+				tr  <- p0
+				
+				# construimos una variable auxiliar
+				# la utilizaremos para detener el algoritmo
+				aux <- 0
+				
+				# inicializamos el iterador
+				i <- 1
+		  
+				# Bucle
+				while ((aux == 0)&(i <= n-1)) {
+					if (tr != 0) {
+						if (tr != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+		  
+							W <- sqrt(T / n) * rnorm(1)
+							tr <- tr +
+							(tr) ^ 2 * (1 - tr) * s11 * 2 * N * T / n +
+							(tr) * (1 - tr) * (1 - 2 * tr) * 2 * N * s12 * T / n -
+							(tr) * (1 - tr) ^ 2 * 2 * N * s22 * T / n +
+							sqrt(tr * (1 - tr)) * W +
+							(((-2 * tr + 1) / (4)) * (W ^ 2 - T / n))
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor menor que 0
+							if (tr <= 0) {
+							tr <- 0
+							}
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor mayor que 1
+							if (tr >= 1) {
+							tr <- 1
+							}
+		  
+						} else {
+							aux <- 1
+							tau[j] <- (i-1)*T/n
+						}
+					} else {
+						aux <- 1
+						tau[j] <- (i-1)*T/n
+					}
+					i <- i+1
+				}
+				
+				if (i == n){
+					tau[j] <- T
+				}
+			}
+		return(tau)
+		}	else{
+			# inicializamos la tr en p0
+				tr  <- p0
+				
+				# construimos una variable auxiliar
+				# la utilizaremos para detener el algoritmo
+				aux <- 0
+				
+				# inicializamos el iterador
+				i <- 1
+		  
+				# Bucle
+				while ((aux == 0)&(i <= n-1)) {
+					if (tr != 0) {
+						if (tr != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+		  
+							tr <- tr + 
+							u2*(1 - tr)*2*N*T/n +
+							(tr)*(1-tr)*s11*2*N*T/n + 
+							(tr)*(1-tr)*(1-2*tr)*s12*2*N*T/n -
+							(tr)*(1-tr)^2*s22*2*N*T/n +
+							sqrt(tr*(1-tr))*W +
+							(((-2 * tr +1)/(4)) * (W^2 - T/n))
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor menor que 0
+							if (tr <= 0) {
+							tr <- 0
+							}
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor mayor que 1
+							if (tr >= 1) {
+							tr <- 1
+							}
+		  
+						} else {
+							aux <- 1
+							tau[j] <- (i-1)*T/n
+						}
+					} else {
+						aux <- 1
+						tau[j] <- (i-1)*T/n
+					}
+					i <- i+1
+				}
+				
+				if (i == n){
+					tau[j] <- T
+				}
+			}
+		return(tau)	
+	}	else{
+			if(u2 == 0){
+				# inicializamos la tr en p0
+				tr  <- p0
+				
+				# construimos una variable auxiliar
+				# la utilizaremos para detener el algoritmo
+				aux <- 0
+				
+				# inicializamos el iterador
+				i <- 1
+		  
+				# Bucle
+				while ((aux == 0)&(i <= n-1)) {
+					if (tr != 0) {
+						if (tr != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+		  
+							W <- sqrt(T / n) * rnorm(1)
+							tr <- tr + 
+								-u1*tr*2*N*T/n +
+								(tr)*(1-tr)*s11*2*N*T/n + 
+								(tr)*(1-tr)*(1-2*tr)*s12*2*N*T/n -
+								(tr)*(1-tr)^2*s22*2*N*T/n +
+								sqrt(tr*(1-tr))*W +
+								(((-2 * tr +1)/(4)) * (W^2 - T/n))
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor menor que 0
+							if (tr <= 0) {
+							tr <- 0
+							}
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor mayor que 1
+							if (tr >= 1) {
+							tr <- 1
+							}
+		  
+						} else {
+							aux <- 1
+							tau[j] <- (i-1)*T/n
+						}
+					} else {
+						aux <- 1
+						tau[j] <- (i-1)*T/n
+					}
+					i <- i+1
+				}
+				
+				if (i == n){
+					tau[j] <- T
+				}
+			return(tau)
+			}	else{
+					# inicializamos la tr en p0
+				tr  <- p0
+				
+				# construimos una variable auxiliar
+				# la utilizaremos para detener el algoritmo
+				aux <- 0
+				
+				# inicializamos el iterador
+				i <- 1
+		  
+				# Bucle
+				while ((aux == 0)&(i <= n-1)) {
+					if (tr != 0) {
+						if (tr != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+							
+							W <- sqrt(T/n)*rnorm(1)
+							
+							tr <- tr +
+								-u1*tr*2*N*T/n +
+								u2*(1 - tr)*2*N*T/n +
+								(tr)*(1-tr)*s11*2*N*T/n + 
+								(tr)*(1-tr)*(1-2*tr)*s12*2*N*T/n -
+								(tr)*(1-tr)^2*s22*2*N*T/n +
+								sqrt(tr*(1-tr))*W +
+								(((-2 * tr +1)/(4)) * (W^2 - T/n))
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor menor que 0
+							if (tr <= 0) {
+							tr <- 0
+							}
+		  
+							# en caso de que por error de simulación
+							# se obtenga un valor mayor que 1
+							if (tr >= 1) {
+							tr <- 1
+							}
+		  
+						} else {
+							aux <- 1
+							tau[j] <- (i-1)*T/n
+						}
+					} else {
+						aux <- 1
+						tau[j] <- (i-1)*T/n
+					}
+					i <- i+1
+				}
+				
+				if (i == n){
+					tau[j] <- T
+				}
+			}
+	return(tau)
+	}
+}
+```
+
+Construiremos un vector, *tau*, que tendrá los valores de $\tau$ simulados para la difusión límite del proceso de Wright-Fisher neutral y sin mutación con valor inicial $X_0 = 0.5$.
+```{r}
+tau <- densidadTau(k = 1000, 
+                   n = 1e5, 
+                   T = 10, 
+                   p0 = 0.5, 
+                   u1 = 0, 
+                   u2 = 0, 
+                   N = 100, 
+                   s11 = 0, 
+                   s12 = 0, 
+                   s22 = 0)
+```
+
+Graficaremos la densidad de $\tau$ con el paquete $\texttt{ggplot2}$.
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+library(latex2exp)
+```
+Para poder graficar con $\texttt{ggplot2}$ construiremos un _dataframe_ auxiliar *densTau*
+
+```{r}
+densidadesTau <- data.frame(tau)
+```
+
+Construiremos un histograma para la densidad de $\tau$. Para controlar la cantidad de _bins_ se puede cambiar el parámetro $\texttt{bins = }$ dentro de $\texttt{geom_histogram()}.
+```{r}
+histTau <- ggplot(densidadesTau, aes(x=tau))+
+  geom_histogram(bins = 50, color="dodgerblue4", fill = "lightblue3", aes(y=..count../sum(..count..))) +   theme(panel.background = element_rect(fill = "gray87",
+                                  colour = "gray87",
+                                  size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "white"), 
+    panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                  colour = "white")
+    ) +
+  xlab(expression(tau)) +
+  ylab("") 
+
+histTau
+```
+Adicionalmente, se puede marcar con una línea dónde se encuentra $\mathbb{E}_x(\tau)$:
+
+```{r}
+histTau +
+  geom_vline(xintercept=mean(densidadesTau$tau), color="red")
+```
+

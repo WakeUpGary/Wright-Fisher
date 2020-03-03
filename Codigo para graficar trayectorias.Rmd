@@ -1,0 +1,248 @@
+---
+title: "Gráfico de trayectorias - Difusión límite del modelo de Wright-Fisher con selección y mutación"
+author: "Gerardo Martínez"
+date: "15 de noviembre de 2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Para graficar las trayectorias será necesario cargar la función $\texttt{trayectoriasWFMS()}$.
+
+```{r include=FALSE}
+trayectoriasWFMS <- function(k, n, T, p0, N, u1, u2, s11, s12, s22) {
+	replicas <- matrix(rep(0, k * (n + 1)), ncol = k)
+  
+	if (u1 == 0) {
+		if (u2 == 0) {
+			for (j in 1:k) {
+				# Inicialización
+				tr <- rep(0, times = n + 1)
+				tr[1] <- p0
+		  
+				# Bucle
+				for (i in 1:n) {
+					if (tr[i] != 0) {
+						if (tr[i] != 1) {
+						
+							# si la frecuencia del alelo
+							# es distinta de 0 o 1, 
+							# utilizo el proceso de difusión
+		  
+							W <- sqrt(T / n) * rnorm(1)
+							tr[i + 1] <- tr[i] +
+							(tr[i]) ^ 2 * (1 - tr[i]) * 2* N * s11 * T / n +
+							(tr[i]) * (1 - tr[i]) * (1 - 2 * tr[i]) * 2 * N * s12 * T / n -
+							(tr[i]) * (1 - tr[i]) ^ 2 * 2 * N * s22 * T / n +
+							sqrt(tr[i] * (1 - tr[i])) * W +
+							(((-2 * tr[i] + 1) / (4)) * (W ^ 2 - T / n))
+		  
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i + 1] <= 0) {
+							tr[i + 1] <- 0
+							}
+		  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i + 1] >= 1) {
+							tr[i + 1] <- 1
+							}
+		  
+						} else {
+							tr[i + 1] <- 1
+						}
+					} else {
+						tr[i + 1] <- 0
+					}
+				}
+				
+				replicas[, j] <- tr
+			}
+		}	else{
+			for (j in 1:k){
+				# Inicialización
+				tr <- rep(0, times = n+1)
+				tr[1] <- p0
+		  
+				# Bucle
+				for (i in 1:n){
+					if (tr[i] != 1){
+						W <- sqrt(T/n)*rnorm(1)
+			  
+						tr[i+1] <- tr[i] + 
+							u2*(1 - tr[i])*2*N*T/n +
+							(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+							(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+							(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+							sqrt(tr[i]*(1-tr[i]))*W +
+							(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+				
+						# en caso de que por error de siulación
+						# se obtenga un valor menor que 0
+						if (tr[i+1]<=0){
+							tr[i+1] <- 0
+						}
+			  
+						# en caso de que por error de siulación
+						# se obtenga un valor mayor que 1
+						if (tr[i+1]>=1){
+							tr[i+1] <- 1
+						}
+					} else {
+						tr[i+1] <- 1
+					}
+				}
+			replicas[,j] <- tr
+			}
+		}
+	}	else{
+			if(u2 == 0){
+				for (j in 1:k){
+					# Inicialización
+					tr <- rep(0, times = n+1)
+					tr[1] <- p0
+			  
+					# Bucle
+					for (i in 1:n){
+						if (tr[i] != 0){
+							W <- sqrt(T/n)*rnorm(1)
+				  
+							tr[i+1] <- tr[i] + 
+								-u1*tr[i]*2*N*T/n +
+								(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+								(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+								(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+								sqrt(tr[i]*(1-tr[i]))*W +
+								(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+					
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i+1]<=0){
+								tr[i+1] <- 0
+							}
+				  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i+1]>=1){
+								tr[i+1] <- 1
+							}
+						} else {
+							tr[i+1] <- 0
+						}
+					}
+					replicas[,j] <- tr
+				}
+			}	else{
+					for (j in 1:k){
+						# Inicialización
+						tr <- rep(0, times = n+1)
+						tr[1] <- p0
+		  
+						# Bucle
+						for (i in 1:n){
+							W <- sqrt(T/n)*rnorm(1)
+				  
+							tr[i+1] <- tr[i] +
+								-u1*tr[i]*2*N*T/n +
+								u2*(1 - tr[i])*2*N*T/n +
+								(tr[i])*(1-tr[i])*s11*2*N*T/n + 
+								(tr[i])*(1-tr[i])*(1-2*tr[i])*s12*2*N*T/n -
+								(tr[i])*(1-tr[i])^2*s22*2*N*T/n +
+								sqrt(tr[i]*(1-tr[i]))*W +
+								(((-2 * tr[i] +1)/(4)) * (W^2 - T/n))
+					
+							# en caso de que por error de siulación
+							# se obtenga un valor menor que 0
+							if (tr[i+1]<=0){
+								tr[i+1] <- 0
+							}
+				  
+							# en caso de que por error de siulación
+							# se obtenga un valor mayor que 1
+							if (tr[i+1]>=1){
+								tr[i+1] <- 1
+							}
+						}
+					replicas[,j] <- tr
+					}
+				}
+	}
+	return(replicas)
+}
+```
+
+Simularemos $k = 10$ trayectorias en $[0,1]$ de parámetros $\mu_1 = \mu_2 = s_{11} = s_{12} = s_{22} = 0$ y con una precisión de $n = 10^4$; esto es equivalente a simular trayectorias del modelo de Wright-Fisher neutral. Las trayectorias serán simuladas con la función $\texttt{trayectoriasWFMS()}$ y el resultado de estas simulaciones será asignado a una variable llamada *replicas*
+
+```{r}
+replicas <- trayectoriasWFMS(k = 10,
+                             n = 1e4,
+                             T = 1,
+                             p0 = 0.5,
+                             N = 100,
+                             u1 = 0,
+                             u2 = 0,
+                             s11 = 0,
+                             s12 = 0,
+                             s22 = 0)
+```
+
+Las trayectorias serán graficadas con el paquete $\texttt{ggplot2}$. Utilizaremos, asimismo, el paquete $\texttt{latex2exp}$ para agregar expresiones matemáticas a los ejes.
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+library(latex2exp)
+```
+Para graficar las trayectorias con $\texttt{ggplot2}$ tenemos que construir un dataframe _largo_. Construiremos un data.frame llamado *Trayectorias* que tendrá un vector con los tiempos $t_i$ y los valores de las $k$ trayectorias $X_{t_i}$.
+
+Necesitaremos los valores de $T$, $n$ y $k$ así que los asignaremos como variables generales.
+
+```{r}
+T <- 1
+n <- 1e4
+k <- 10
+```
+
+
+```{r}
+Trayectorias <- data.frame(seq(from = 0, to = T, by = T/n), replicas)
+```
+Modificaremos los nombres de las columnas
+
+```{r}
+nombreTrayectoria <- c()
+for (i in 1:k){
+  nombreTrayectoria <- c(nombreTrayectoria, paste("Trayectoria", i, sep = ""))
+}
+names(Trayectorias) <- c("Generacion", nombreTrayectoria)
+```
+
+La construcción del dataframe _largo_ se hará mediante el paquete $\texttt{reshape2}$
+```{r}
+library(reshape2)
+```
+
+Utilizaremos la función $\texttt{melt}()$ del paquete $\texttt{reshape2}$ para construir el dataframe apropiado para le paquete $\texttt{ggplot2}$.
+
+```{r}
+Trayectorias <- melt(Trayectorias,
+                       id.vars = 'Generacion', 
+                       variable.name = 'Trayectorias')
+
+names(Trayectorias)  <- c("Generacion", "Trayectorias", "Frecuencia")
+```
+
+La trayectoria será graficada con la función $\texttt{ggplot()}$. Para cambiar el color de las trayectorias se debe cambiar el parámetro $\texttt{colour=}$ dentro de $\texttt{geom_line()}$. 
+```{r}
+ggplot(Trayectorias, 
+         aes(Generacion, Frecuencia, group = Trayectorias)) + geom_line(alpha = 0.5, colour="orangered3") + theme(
+    panel.background = element_rect(fill = "gray87",
+                                  colour = "gray87",
+                                  size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                  colour = "white"), 
+    panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                  colour = "white")
+    ) + coord_cartesian(ylim = c(0, 1), xlim = c(0, T)) +
+  ylab(TeX("X_t")) +
+  xlab(TeX("t"))
+```
